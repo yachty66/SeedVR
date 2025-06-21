@@ -250,7 +250,8 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
             print(f"Read video size: {video_tensor.size()}")
 
             total_frames = video_tensor.shape[0]
-            chunk_size = 64  # Process 64 frames at a time
+            chunk_size = 32  # Process in smaller chunks to reduce VAE memory pressure
+            print(f"Processing in chunks of {chunk_size} frames.")
             output_chunks = []
             input_chunks_for_colorfix = []
 
