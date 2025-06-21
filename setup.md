@@ -16,3 +16,5 @@ PYTHONPATH=. torchrun --nproc-per-node=2 projects/inference_seedvr2_7b.py --vide
 
 
 PYTHONPATH=. torchrun --nproc-per-node=2 projects/inference_seedvr2_7b.py --video_path input_folder --output_dir output_folder --seed 2 --res_h 720 --res_w 1280 --sp_size 2
+
+PYTHONPATH=. torchrun --nproc-per-node=4 projects/inference_seedvr2_7b.py --video_path input_folder --output_dir output_folder --seed 2 --res_h 720 --res_w 1280 --sp_size 2
