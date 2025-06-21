@@ -240,15 +240,17 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
     for videos, text_embeds in tqdm(zip(original_videos_local, positive_prompts_embeds)):
         # read condition latents
         cond_latents = []
+        video_fps_list = []
         for video in videos:
-            video = (
+            video_tensor, _, info = (
                 read_video(
                    os.path.join(video_path, video), output_format="TCHW"
-                )[0]
-                / 255.0
+                )
             )
-            print(f"Read video size: {video.size()}")
-            cond_latents.append(video_transform(video.to(get_device())))
+            video_fps_list.append(info.get("video_fps", 24))
+            video_tensor = video_tensor / 255.0
+            print(f"Read video size: {video_tensor.size()}")
+            cond_latents.append(video_transform(video_tensor.to(get_device())))
 
         ori_lengths = [video.size(1) for video in cond_latents]
         input_videos = cond_latents
@@ -272,8 +274,8 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
 
         # dump samples to the output directory
         if get_sequence_parallel_rank() == 0:
-            for path, input, sample, ori_length in zip(
-                videos, input_videos, samples, ori_lengths
+            for path, input, sample, ori_length, orig_fps in zip(
+                videos, input_videos, samples, ori_lengths, video_fps_list
             ):
                 if ori_length < sample.shape[0]:
                     sample = sample[:ori_length]
@@ -302,7 +304,7 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
                     mediapy.write_image(filename, sample.squeeze(0))
                 else:
                     mediapy.write_video(
-                        filename, sample, fps=24
+                        filename, sample, fps=orig_fps
                     )
         gc.collect()
         torch.cuda.empty_cache()

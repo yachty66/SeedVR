@@ -5,7 +5,7 @@
 from huggingface_hub import snapshot_download
 
 save_dir = "ckpts/"
-repo_id = "ByteDance-Seed/SeedVR2-3B"
+repo_id = "ByteDance-Seed/SeedVR2-7B"
 cache_dir = save_dir + "/cache"
 
 snapshot_download(cache_dir=cache_dir,

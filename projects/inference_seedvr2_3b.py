@@ -132,7 +132,7 @@ def generation_step(runner, text_embeds_dict, cond_latents):
 
     return samples
 
-def generation_loop(runner, video_path='./test_videos', output_dir='./results', batch_size=1, cfg_scale=1.0, cfg_rescale=0.0, sample_steps=1, seed=666, res_h=1280, res_w=720, sp_size=1):
+def generation_loop(runner, video_path='./test_videos', output_dir='./results', batch_size=1, cfg_scale=1.0, cfg_rescale=0.0, sample_steps=1, seed=666, res_h=1280, res_w=720, sp_size=1, max_frames=None):
 
     def _build_pos_and_neg_prompt():
         # read positive prompt
@@ -248,36 +248,20 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
                 )[0]
                 / 255.0
             )
-            print(f"Read video size: {video.size()}")
-            cond_latents.append(video_transform(video.to(get_device())))
-
-        ori_lengths = [video.size(1) for video in cond_latents]
-        input_videos = cond_latents
-        cond_latents = [cut_videos(video, sp_size) for video in cond_latents]
-
-        runner.dit.to("cpu")
-        print(f"Encoding videos: {list(map(lambda x: x.size(), cond_latents))}")
-        runner.vae.to(get_device())
-        cond_latents = runner.vae_encode(cond_latents)
-        runner.vae.to("cpu")
-        runner.dit.to(get_device())
-
-        for i, emb in enumerate(text_embeds["texts_pos"]):
-            text_embeds["texts_pos"][i] = emb.to(get_device())
-        for i, emb in enumerate(text_embeds["texts_neg"]):
-            text_embeds["texts_neg"][i] = emb.to(get_device())
-
-        samples = generation_step(runner, text_embeds, cond_latents=cond_latents)
-        runner.dit.to("cpu")
-        del cond_latents
+            video = video.to(get_device())
+            video = cut_videos(video, sp_size)
+            print(f"Loaded video size: {video.size()}")
+            cond_latents.append(
+                runner.vae_encode(video_transform(video))
+            )
+        print(f"Encoding videos: {[i.size() for i in cond_latents]}")
+        samples = generation_step(runner, text_embeds, cond_latents)
 
         # dump samples to the output directory
         if get_sequence_parallel_rank() == 0:
-            for path, input, sample, ori_length in zip(
-                videos, input_videos, samples, ori_lengths
+            for path, input, sample in zip(
+                videos, cond_latents, samples
             ):
-                if ori_length < sample.shape[0]:
-                    sample = sample[:ori_length]
                 filename = os.path.join(tgt_path, os.path.basename(path))
                 # color fix
                 input = (
@@ -308,15 +292,23 @@ def generation_loop(runner, video_path='./test_videos', output_dir='./results', 
         gc.collect()
         torch.cuda.empty_cache()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser() 
+def main():
+    parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", type=str, default="./test_videos")
     parser.add_argument("--output_dir", type=str, default="./results")
+    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--cfg_scale", type=float, default=1.0)
+    parser.add_argument("--cfg_rescale", type=float, default=0.0)
+    parser.add_argument("--sample_steps", type=int, default=1)
     parser.add_argument("--seed", type=int, default=666)
     parser.add_argument("--res_h", type=int, default=720)
     parser.add_argument("--res_w", type=int, default=1280)
     parser.add_argument("--sp_size", type=int, default=1)
+    parser.add_argument("--max_frames", type=int, default=None)
     args = parser.parse_args()
-
     runner = configure_runner(args.sp_size)
     generation_loop(runner, **vars(args))
+
+
+if __name__ == "__main__":
+    main()
